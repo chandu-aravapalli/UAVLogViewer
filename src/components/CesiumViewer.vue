@@ -1,21 +1,32 @@
 <template>
     <div id="wrapper">
         <div id="toolbar">
-          <table class="infoPanel">
-                <select class="color-coding-select" v-model="selectedColorCoder" v-on:change="updateColor">
-                    <option :key="key"  :value="key" v-for="(value, key) in useableColorCoders">
+            <table class="infoPanel">
+                <select
+                    class="color-coding-select"
+                    v-model="selectedColorCoder"
+                    v-on:change="updateColor"
+                >
+                    <option
+                        :key="key"
+                        :value="key"
+                        v-for="(value, key) in useableColorCoders"
+                    >
                         {{ key }}
                     </option>
                 </select>
-              <tbody>
-                <tr v-bind:key="mode[0]" v-for="mode in colorCodeLegend">
-                    <td class="mode" v-bind:style="{ color: mode.color } ">{{ mode.name }}</td>
-                </tr>
-              </tbody>
+                <tbody>
+                    <tr v-bind:key="mode[0]" v-for="mode in colorCodeLegend">
+                        <td class="mode" v-bind:style="{ color: mode.color }">
+                            {{ mode.name }}
+                        </td>
+                    </tr>
+                </tbody>
             </table>
             <CesiumSettingsWidget />
         </div>
         <div id="cesiumContainer"></div>
+        <ChatbotWidget />
     </div>
 </template>
 
@@ -25,7 +36,8 @@ import {
     Color,
     ProviderViewModel,
     UrlTemplateImageryProvider,
-    Viewer, createWorldTerrainAsync,
+    Viewer,
+    createWorldTerrainAsync,
     PointPrimitiveCollection,
     ImageryLayer,
     IonImageryProvider,
@@ -72,6 +84,7 @@ import { MavlinkDataExtractor } from '../tools/mavlinkDataExtractor'
 import { DjiDataExtractor } from '../tools/djiDataExtractor'
 import 'cesium/Build/Cesium/Widgets/widgets.css'
 import CesiumSettingsWidget from './widgets/CesiumSettingsWidget.vue'
+import ChatbotWidget from './ChatbotWidget.vue'
 import ColorCoderMode from './cesiumExtra/colorCoderMode.js'
 import ColorCoderRange from './cesiumExtra/colorCoderRange.js'
 import ColorCoderPlot from './cesiumExtra/colorCoderPlot.js'
@@ -92,12 +105,12 @@ const colorCoderRange = new ColorCoderRange(store)
 
 function getMinTime (data) {
     // returns the minimum time in the array. Used to define the time range
-    return data.reduce((min, p) => p[3] < min ? p[3] : min, data[0][3])
+    return data.reduce((min, p) => (p[3] < min ? p[3] : min), data[0][3])
 }
 
 function getMaxTime (data) {
     // returns the maximum time in   the array. Used to define the time range
-    return data.reduce((max, p) => p[3] > max ? p[3] : max, data[0][3])
+    return data.reduce((max, p) => (p[3] > max ? p[3] : max), data[0][3])
 }
 
 export default {
@@ -113,7 +126,8 @@ export default {
         }
     },
     components: {
-        CesiumSettingsWidget
+        CesiumSettingsWidget,
+        ChatbotWidget
     },
     created () {
         this.updateShader()
@@ -151,58 +165,103 @@ export default {
 
                 this.viewer.scene.postProcessStages.ambientOcclusion.enabled = false
                 this.viewer.scene.postProcessStages.bloom.enabled = false
-                this.clickableTrajectory = this.viewer.scene.primitives.add(new PointPrimitiveCollection())
+                this.clickableTrajectory = this.viewer.scene.primitives.add(
+                    new PointPrimitiveCollection()
+                )
                 this.trajectory = this.viewer.entities.add(new Entity())
                 this.trajectoryUpdateTimeout = null
                 this.viewer.scene.globe.enableLighting = true
-                this.viewer.scene.postRender.addEventListener(this.onFrameUpdate)
-                this.viewer.scene.postRender.addEventListener(this.onFrameUpdate)
-                this.viewer.scene.morphComplete.addEventListener(
-                    () => {
-                        this.viewer.zoomTo(this.viewer.entities)
-                    })
-                this.viewer.animation.viewModel.setShuttleRingTicks([0.1, 0.25, 0.5, 0.75, 1, 2, 5, 10, 15])
+                this.viewer.scene.postRender.addEventListener(
+                    this.onFrameUpdate
+                )
+                this.viewer.scene.postRender.addEventListener(
+                    this.onFrameUpdate
+                )
+                this.viewer.scene.morphComplete.addEventListener(() => {
+                    this.viewer.zoomTo(this.viewer.entities)
+                })
+                this.viewer.animation.viewModel.setShuttleRingTicks([
+                    0.1,
+                    0.25,
+                    0.5,
+                    0.75,
+                    1,
+                    2,
+                    5,
+                    10,
+                    15
+                ])
                 this.viewer.scene.globe.depthTestAgainstTerrain = true
                 this.viewer.shadowMap.maxmimumDistance = 10000.0
                 this.viewer.shadowMap.softShadows = true
                 this.viewer.shadowMap.size = 4096
-                this.viewer.animation.viewModel.timeFormatter = (date, _viewModel) => {
+                this.viewer.animation.viewModel.timeFormatter = (
+                    date,
+                    _viewModel
+                ) => {
                     const isoString = JulianDate.toIso8601(date)
                     let dateTime = DateTime.fromISO(isoString)
                     // get zone from current cesium location
-                    const cameraPosition = this.viewer.camera.positionCartographic
-                    const longitude = cameraPosition.longitude * 180 / Math.PI
-                    const latitude = cameraPosition.latitude * 180 / Math.PI
+                    const cameraPosition = this.viewer.camera
+                        .positionCartographic
+                    const longitude =
+                        (cameraPosition.longitude * 180) / Math.PI
+                    const latitude = (cameraPosition.latitude * 180) / Math.PI
 
                     const timezone = tzlookup(latitude, longitude)
                     dateTime = dateTime.setZone(timezone)
                     // If you want to set a specific timezone
                     // dateTime = dateTime.setZone("America/Chicago");
-                    const offset = dateTime.offsetNameShort || dateTime.offsetNameLong
-                    return `${dateTime.toLocaleString(DateTime.TIME_SIMPLE)} (${offset})`
+                    const offset =
+                        dateTime.offsetNameShort || dateTime.offsetNameLong
+                    return `${dateTime.toLocaleString(
+                        DateTime.TIME_SIMPLE
+                    )} (${offset})`
                 }
                 // Attach hover handler
-                const handler = new ScreenSpaceEventHandler(this.viewer.scene.canvas)
-                handler.setInputAction(this.onMove, ScreenSpaceEventType.MOUSE_MOVE)
-                handler.setInputAction(this.onLeftDown, ScreenSpaceEventType.LEFT_DOWN)
-                handler.setInputAction(this.onClick, ScreenSpaceEventType.LEFT_CLICK)
-                handler.setInputAction(this.onLeftUp, ScreenSpaceEventType.LEFT_UP)
+                const handler = new ScreenSpaceEventHandler(
+                    this.viewer.scene.canvas
+                )
+                handler.setInputAction(
+                    this.onMove,
+                    ScreenSpaceEventType.MOUSE_MOVE
+                )
+                handler.setInputAction(
+                    this.onLeftDown,
+                    ScreenSpaceEventType.LEFT_DOWN
+                )
+                handler.setInputAction(
+                    this.onClick,
+                    ScreenSpaceEventType.LEFT_CLICK
+                )
+                handler.setInputAction(
+                    this.onLeftUp,
+                    ScreenSpaceEventType.LEFT_UP
+                )
                 // TODO: fix saving and sharing state
                 // this.viewer.camera.moveEnd.addEventListener(this.onCameraUpdate)
 
-                knockout.getObservable(this.viewer.clockViewModel, 'shouldAnimate').subscribe(this.onAnimationChange)
+                knockout
+                    .getObservable(this.viewer.clockViewModel, 'shouldAnimate')
+                    .subscribe(this.onAnimationChange)
                 const layers = this.viewer.scene.imageryLayers
                 const xofs = 0.00001
                 const options = {
                     url: require('../assets/home2.png').default,
                     tileWidth: 1920,
                     tileHeight: 1080,
-                    rectangle: Rectangle.fromDegrees(-48.530077110530044 + xofs, -27.490619277419633,
-                        -48.52971476731231 + xofs, -27.49044182943895),
+                    rectangle: Rectangle.fromDegrees(
+                        -48.530077110530044 + xofs,
+                        -27.490619277419633,
+                        -48.52971476731231 + xofs,
+                        -27.49044182943895
+                    ),
                     credit: 'potato'
                 }
                 console.log(options)
-                layers.addImageryProvider(new SingleTileImageryProvider(options))
+                layers.addImageryProvider(
+                    new SingleTileImageryProvider(options)
+                )
                 this.viewer.scene.globe.translucency.frontFaceAlphaByDistance = new NearFarScalar(
                     50.0,
                     0.4,
@@ -223,24 +282,31 @@ export default {
             this.addCloseButton()
 
             for (const pos of this.state.currentTrajectory) {
-                this.correctedTrajectory.push(Cartographic.fromDegrees(pos[0], pos[1], pos[2]))
+                this.correctedTrajectory.push(
+                    Cartographic.fromDegrees(pos[0], pos[1], pos[2])
+                )
             }
 
             if (this.state.vehicle !== 'boat' && this.state.isOnline) {
-                const promise = sampleTerrainMostDetailed(this.viewer.terrainProvider, this.correctedTrajectory)
-                promise.then(async (result) => { await this.setup2(result) })
+                const promise = sampleTerrainMostDetailed(
+                    this.viewer.terrainProvider,
+                    this.correctedTrajectory
+                )
+                promise.then(async result => {
+                    await this.setup2(result)
+                })
             } else {
                 this.setup2(this.correctedTrajectory)
             }
         },
         updateShader () {
             // eslint-disable-next-line camelcase
-            ShaderSource._czmBuiltinsAndUniforms.czm_translateRelativeToEye =
-            ShaderSource._czmBuiltinsAndUniforms.czm_translateRelativeToEye.replace(
+            ShaderSource._czmBuiltinsAndUniforms.czm_translateRelativeToEye = ShaderSource._czmBuiltinsAndUniforms.czm_translateRelativeToEye.replace(
                 'low - czm_encodedCameraPositionMCLow;',
                 '(low - czm_encodedCameraPositionMCLow) * (1.0 + czm_epsilon7);'
             )
         },
+
         async updateColor () {
             const newCoder = this.availableColorCoders[this.selectedColorCoder]
             await this.waitForMessages(newCoder.requiredMessages)
@@ -250,31 +316,7 @@ export default {
             if (online) {
                 console.log('creating online viewer')
                 const imageryProviders = this.createAdditionalProviders()
-                return new Viewer(
-                    'cesiumContainer',
-                    {
-                        homeButton: false,
-                        timeline: true,
-                        animation: true,
-                        requestRenderMode: true,
-                        shouldAnimate: false,
-                        scene3DOnly: false,
-                        selectionIndicator: false,
-                        shadows: true,
-                        // eslint-disable-next-line
-                        baseLayer: new ImageryLayer.fromProviderAsync(
-                            IonImageryProvider.fromAssetId(3954)
-                        ),
-                        imageryProviderViewModels: imageryProviders,
-                        orderIndependentTranslucency: false,
-                        useBrowserRecommendedResolution: false
-                    }
-                )
-            }
-            console.log('creating offline viewer')
-            return new Viewer(
-                'cesiumContainer',
-                {
+                return new Viewer('cesiumContainer', {
                     homeButton: false,
                     timeline: true,
                     animation: true,
@@ -283,45 +325,68 @@ export default {
                     scene3DOnly: false,
                     selectionIndicator: false,
                     shadows: true,
+                    // eslint-disable-next-line
+                    baseLayer: new ImageryLayer.fromProviderAsync(
+                        IonImageryProvider.fromAssetId(2)
+                    ),
+                    imageryProviderViewModels: imageryProviders,
                     orderIndependentTranslucency: false,
-                    baseLayerPicker: false,
-                    imageryProvider: false,
-                    geocoder: false,
                     useBrowserRecommendedResolution: false
-                }
-            )
+                })
+            }
+            console.log('creating offline viewer')
+            return new Viewer('cesiumContainer', {
+                homeButton: false,
+                timeline: true,
+                animation: true,
+                requestRenderMode: true,
+                shouldAnimate: false,
+                scene3DOnly: false,
+                selectionIndicator: false,
+                shadows: true,
+                orderIndependentTranslucency: false,
+                baseLayerPicker: false,
+                imageryProvider: false,
+                geocoder: false,
+                useBrowserRecommendedResolution: false
+            })
         },
 
         createAdditionalProviders () {
             /*
-            *  Creates and returns the providers for viewing the Eniro, Statkart, and OpenSeaMap map layers
-            * */
+             *  Creates and returns the providers for viewing the Eniro, Statkart, and OpenSeaMap map layers
+             * */
             // const imageryProviders = createDefaultImageryProviderViewModels()
             const imageryProviders = []
-            imageryProviders.push(new ProviderViewModel({
-                name: 'StatKart',
-                iconUrl: require('../assets/statkart.jpg').default,
-                tooltip: 'Statkart aerial imagery \nhttp://statkart.no/',
-                creationFunction: function () {
-                    return new UrlTemplateImageryProvider({
-                        url: 'http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom={z}&x={x}&y={y}',
-                        credit: 'Map tiles by Statkart.'
-                    })
-                }
-            }))
-            imageryProviders.push(new ProviderViewModel({
-                name: 'MapTiler',
-                iconUrl: require('../assets/maptiler.png').default,
-                tooltip: 'Maptiler satellite imagery http://maptiler.com/',
-                creationFunction: function () {
-                    return new UrlTemplateImageryProvider({
-                        url: 'https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=o3JREHNnXex8WSPPm2BU',
-                        minimumLevel: 0,
-                        maximumLevel: 20,
-                        credit: 'https://www.maptiler.com/copyright'
-                    })
-                }
-            })
+            imageryProviders.push(
+                new ProviderViewModel({
+                    name: 'StatKart',
+                    iconUrl: require('../assets/statkart.jpg').default,
+                    tooltip: 'Statkart aerial imagery \nhttp://statkart.no/',
+                    creationFunction: function () {
+                        return new UrlTemplateImageryProvider({
+                            url:
+                                'http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo4&zoom={z}&x={x}&y={y}',
+                            credit: 'Map tiles by Statkart.'
+                        })
+                    }
+                })
+            )
+            imageryProviders.push(
+                new ProviderViewModel({
+                    name: 'MapTiler',
+                    iconUrl: require('../assets/maptiler.png').default,
+                    tooltip: 'Maptiler satellite imagery http://maptiler.com/',
+                    creationFunction: function () {
+                        return new UrlTemplateImageryProvider({
+                            url:
+                                'https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=o3JREHNnXex8WSPPm2BU',
+                            minimumLevel: 0,
+                            maximumLevel: 20,
+                            credit: 'https://www.maptiler.com/copyright'
+                        })
+                    }
+                })
             )
             // save this one so it can be referenced when creating the cesium viewer
             this.sentinelProvider = new ProviderViewModel({
@@ -329,49 +394,58 @@ export default {
                 iconUrl: '/Widgets/Images/ImageryProviders/sentinel-2.png',
                 tooltip: 'Sentinel 2 Imagery',
                 creationFunction: function () {
-                    return ImageryLayer.fromProviderAsync(IonImageryProvider.fromAssetId(3812))
+                    return ImageryLayer.fromProviderAsync(
+                        IonImageryProvider.fromAssetId(3812)
+                    )
                 }
             })
             imageryProviders.push(this.sentinelProvider)
-            imageryProviders.push(new ProviderViewModel({
-                name: 'Eniro',
-                iconUrl: require('../assets/eniro.png').default,
-                tooltip: 'Eniro aerial imagery \nhttp://map.eniro.com/',
-                creationFunction: function () {
-                    return new UrlTemplateImageryProvider({
-                        // url: 'http://map.eniro.com/geowebcache/service/tms1.0.0/map/{z}/{x}/{reverseY}.png',
-                        url: '/eniro/{z}/{x}/{reverseY}.png',
-                        credit: 'Map tiles by Eniro.'
-                    })
-                }
-            }))
-            imageryProviders.push(new ProviderViewModel({
-                name: 'OpenSeaMap',
-                iconUrl: require('../assets/openseamap.png').default,
-                tooltip: 'OpenSeaMap Nautical Maps \nhttp://openseamap.org/',
-                parameters: {
-                    transparent: 'true',
-                    format: 'image/png'
-                },
-                creationFunction: function () {
-                    return [
-                        new UrlTemplateImageryProvider({
-                            url: 'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                            credit: 'Map tiles by OpenStreetMap.'
-                        }),
-                        new UrlTemplateImageryProvider({
-                            url: 'http://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
-                            credit: 'Map tiles by OpenSeaMap.'
+            imageryProviders.push(
+                new ProviderViewModel({
+                    name: 'Eniro',
+                    iconUrl: require('../assets/eniro.png').default,
+                    tooltip: 'Eniro aerial imagery \nhttp://map.eniro.com/',
+                    creationFunction: function () {
+                        return new UrlTemplateImageryProvider({
+                            // url: 'http://map.eniro.com/geowebcache/service/tms1.0.0/map/{z}/{x}/{reverseY}.png',
+                            url: '/eniro/{z}/{x}/{reverseY}.png',
+                            credit: 'Map tiles by Eniro.'
                         })
-                    ]
-                }
-            }))
+                    }
+                })
+            )
+            imageryProviders.push(
+                new ProviderViewModel({
+                    name: 'OpenSeaMap',
+                    iconUrl: require('../assets/openseamap.png').default,
+                    tooltip:
+                        'OpenSeaMap Nautical Maps \nhttp://openseamap.org/',
+                    parameters: {
+                        transparent: 'true',
+                        format: 'image/png'
+                    },
+                    creationFunction: function () {
+                        return [
+                            new UrlTemplateImageryProvider({
+                                url:
+                                    'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                credit: 'Map tiles by OpenStreetMap.'
+                            }),
+                            new UrlTemplateImageryProvider({
+                                url:
+                                    'http://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
+                                credit: 'Map tiles by OpenSeaMap.'
+                            })
+                        ]
+                    }
+                })
+            )
             return imageryProviders
         },
         async setup2 (updatedPositions) {
             /*
-            * Second step of setup, happens after the height of the starting point has been returned by Cesium
-            * */
+             * Second step of setup, happens after the height of the starting point has been returned by Cesium
+             * */
             this.state.trajectorySource = this.state.trajectorySources[0]
             this.loadTrajectory(this.state.trajectorySource)
             this.state.heightOffset = 0
@@ -408,7 +482,9 @@ export default {
                             this.viewer.camera.direction = direction
                         } */
             // TODO: Find a better way to know that cesium finished loading
-            setTimeout(() => { this.state.mapLoading = false }, 2000)
+            setTimeout(() => {
+                this.state.mapLoading = false
+            }, 2000)
             this.state.cameraType = 'follow'
             this.changeCamera()
             setTimeout(this.updateTimelineColors, 500)
@@ -429,10 +505,15 @@ export default {
                     for (const message of messages) {
                         if (!_this.state.messages[message]) {
                             counter += 1
-                            if (counter > 30) { // 30 * 300ms = 9 s timeout
+                            if (counter > 30) {
+                                // 30 * 300ms = 9 s timeout
                                 console.log('not resolving')
                                 clearInterval(interval)
-                                reject(new Error(`Could not load messageType ${message}`))
+                                reject(
+                                    new Error(
+                                        `Could not load messageType ${message}`
+                                    )
+                                )
                             }
                             return
                         }
@@ -475,22 +556,30 @@ export default {
                 update([position])
                 console.log('skipping sample')
             } else {
-                const promise = sampleTerrainMostDetailed(this.viewer.terrainProvider,
-                    [position])
+                const promise = sampleTerrainMostDetailed(
+                    this.viewer.terrainProvider,
+                    [position]
+                )
                 promise.then(update)
             }
         },
         addCloseButton () {
             /* Creates the close button on the Cesium toolbar */
-            const toolbar = document.getElementsByClassName('cesium-viewer-toolbar')[0]
+            const toolbar = document.getElementsByClassName(
+                'cesium-viewer-toolbar'
+            )[0]
 
             let closeButton = document.createElement('span')
             if (closeButton.classList) {
-                closeButton.classList.add('cesium-navigationHelpButton-wrapper')
+                closeButton.classList.add(
+                    'cesium-navigationHelpButton-wrapper'
+                )
             } else {
-                closeButton.className += ' ' + 'cesium-navigationHelpButton-wrapper'
+                closeButton.className +=
+                    ' ' + 'cesium-navigationHelpButton-wrapper'
             }
-            closeButton.innerHTML = '' +
+            closeButton.innerHTML =
+                '' +
                 '<button type="button" ' +
                 'id="cesium-close-button" ' +
                 'class="cesium-button cesium-toolbar-button cesium-close-button" ' +
@@ -510,23 +599,31 @@ export default {
         },
         addBathymetryButton () {
             /* Creates the bathymetry button on the Cesium toolbar */
-            const toolbar = document.getElementsByClassName('cesium-viewer-toolbar')[0]
+            const toolbar = document.getElementsByClassName(
+                'cesium-viewer-toolbar'
+            )[0]
 
             let bathymetryButton = document.createElement('span')
             if (bathymetryButton.classList) {
-                bathymetryButton.classList.add('cesium-navigationHelpButton-wrapper')
+                bathymetryButton.classList.add(
+                    'cesium-navigationHelpButton-wrapper'
+                )
             } else {
-                bathymetryButton.className += ' ' + 'cesium-navigationHelpButton-wrapper'
+                bathymetryButton.className +=
+                    ' ' + 'cesium-navigationHelpButton-wrapper'
             }
-            bathymetryButton.innerHTML = '' +
-              '<button type="button" ' +
-              'id="cesium-bathymetry-button" ' +
-              'class="cesium-button cesium-toolbar-button"' +
-              'title="Toggle Bathymetry">' +
-              '<i class="fas fa-ship" style="font-style: unset;"></i>' +
-              '</button>'.trim()
+            bathymetryButton.innerHTML =
+                '' +
+                '<button type="button" ' +
+                'id="cesium-bathymetry-button" ' +
+                'class="cesium-button cesium-toolbar-button"' +
+                'title="Toggle Bathymetry">' +
+                '<i class="fas fa-ship" style="font-style: unset;"></i>' +
+                '</button>'.trim()
             toolbar.append(bathymetryButton)
-            bathymetryButton = document.getElementById('cesium-bathymetry-button')
+            bathymetryButton = document.getElementById(
+                'cesium-bathymetry-button'
+            )
             bathymetryButton.addEventListener('click', () => {
                 this.plotBathymetry()
                 this.viewer.scene.requestRender()
@@ -534,15 +631,21 @@ export default {
         },
         addFitContentsButton () {
             /* Creates the close button on the Cesium toolbar */
-            const toolbar = document.getElementsByClassName('cesium-viewer-toolbar')[0]
+            const toolbar = document.getElementsByClassName(
+                'cesium-viewer-toolbar'
+            )[0]
 
             let closeButton = document.createElement('span')
             if (closeButton.classList) {
-                closeButton.classList.add('cesium-navigationHelpButton-wrapper')
+                closeButton.classList.add(
+                    'cesium-navigationHelpButton-wrapper'
+                )
             } else {
-                closeButton.className += ' ' + 'cesium-navigationHelpButton-wrapper'
+                closeButton.className +=
+                    ' ' + 'cesium-navigationHelpButton-wrapper'
             }
-            closeButton.innerHTML = '' +
+            closeButton.innerHTML =
+                '' +
                 '<button type="button" ' +
                 'id="cesium-fit-button" ' +
                 'class="cesium-button cesium-toolbar-button"' +
@@ -560,15 +663,21 @@ export default {
         },
         addCenterVehicleButton () {
             /* Creates the close button on the Cesium toolbar */
-            const toolbar = document.getElementsByClassName('cesium-viewer-toolbar')[0]
+            const toolbar = document.getElementsByClassName(
+                'cesium-viewer-toolbar'
+            )[0]
 
             let closeButton = document.createElement('span')
             if (closeButton.classList) {
-                closeButton.classList.add('cesium-navigationHelpButton-wrapper')
+                closeButton.classList.add(
+                    'cesium-navigationHelpButton-wrapper'
+                )
             } else {
-                closeButton.className += ' ' + 'cesium-navigationHelpButton-wrapper'
+                closeButton.className +=
+                    ' ' + 'cesium-navigationHelpButton-wrapper'
             }
-            closeButton.innerHTML = '' +
+            closeButton.innerHTML =
+                '' +
                 '<button type="button" ' +
                 'id="cesium-center-vehicle-button" ' +
                 'class="cesium-button cesium-toolbar-button"' +
@@ -577,7 +686,9 @@ export default {
                 '</svg>' +
                 '</button>'.trim()
             toolbar.append(closeButton)
-            closeButton = document.getElementById('cesium-center-vehicle-button')
+            closeButton = document.getElementById(
+                'cesium-center-vehicle-button'
+            )
             closeButton.addEventListener('click', () => {
                 this.$nextTick(() => {
                     this.viewer.flyTo(this.model)
@@ -597,7 +708,8 @@ export default {
                 cam.up.x.toFixed(2),
                 cam.up.y.toFixed(2),
                 cam.up.z.toFixed(2),
-                this.cameraType].join(',')
+                this.cameraType
+            ].join(',')
             this.$router.push({ query: query })
         },
 
@@ -625,14 +737,16 @@ export default {
                             return true
                         }
                         return
-                    } catch (e) {
-                    }
+                    } catch (e) {}
                 }
             }
             return false
         },
         changeCamera () {
-            if (this.cameraType === 'follow' && this.viewer.trackedEntity !== this.model) {
+            if (
+                this.cameraType === 'follow' &&
+                this.viewer.trackedEntity !== this.model
+            ) {
                 this.viewer.trackedEntity = this.model
             } else {
                 this.viewer.trackedEntity = undefined
@@ -645,10 +759,14 @@ export default {
         //     this.viewer.timeline.zoomTo(this.msToCesiumTime(event[0]), this.msToCesiumTime(event[1]))
         // },
         updateTimelineColors () {
-            const start = this.cesiumTimeToMs(this.viewer.timeline._startJulian)
+            const start = this.cesiumTimeToMs(
+                this.viewer.timeline._startJulian
+            )
             const end = this.cesiumTimeToMs(this.viewer.timeline._endJulian)
 
-            const timeline = document.getElementsByClassName('cesium-timeline-bar')[0]
+            const timeline = document.getElementsByClassName(
+                'cesium-timeline-bar'
+            )[0]
             let colors = []
             let previousColor = null
             for (const change of this.state.flightModeChanges) {
@@ -656,8 +774,9 @@ export default {
                     previousColor = this.getModeColor(change[0])
                     colors = [[0, previousColor]]
                 }
-                if ((change[0] > start) && change[0] < end) {
-                    const percentage = (change[0] - start) * 100 / (end - start)
+                if (change[0] > start && change[0] < end) {
+                    const percentage =
+                        ((change[0] - start) * 100) / (end - start)
                     colors.push([percentage - 0.001, previousColor])
                     colors.push([percentage, this.getModeColor(change[0])])
                     previousColor = this.getModeColor(change[0])
@@ -668,8 +787,17 @@ export default {
             let string = 'linear-gradient(to right'
             if (colors.length > 1) {
                 for (const change of colors) {
-                    string = string + ', rgba(' + change[1].red * 150 + ',' + change[1].green * 150 + ',' +
-                        change[1].blue * 150 + ', 100) ' + change[0] + '%'
+                    string =
+                        string +
+                        ', rgba(' +
+                        change[1].red * 150 +
+                        ',' +
+                        change[1].green * 150 +
+                        ',' +
+                        change[1].blue * 150 +
+                        ', 100) ' +
+                        change[0] +
+                        '%'
                 }
 
                 string = string + ')'
@@ -706,12 +834,15 @@ export default {
 
         onClick (movement) {
             if (this.mouseIsOnPoint(movement.position)) {
-                this.$eventHub.$emit('cesium-time-changed', this.lastHoveredTime)
-                this.viewer.clock.currentTime =
-                    JulianDate.addSeconds(
-                        this.getTimeStart(),
-                        (this.lastHoveredTime - this.startTimeMs) / 1000,
-                        new JulianDate())
+                this.$eventHub.$emit(
+                    'cesium-time-changed',
+                    this.lastHoveredTime
+                )
+                this.viewer.clock.currentTime = JulianDate.addSeconds(
+                    this.getTimeStart(),
+                    (this.lastHoveredTime - this.startTimeMs) / 1000,
+                    new JulianDate()
+                )
             }
             this.onLeftUp()
         },
@@ -720,13 +851,15 @@ export default {
             if (this.showClickableTrajectory) {
                 if (this.isDragging) {
                     if (this.mouseIsOnPoint(movement.endPosition)) {
-                        this.$eventHub.$emit('cesium-time-changed', this.lastHoveredTime)
-                        this.viewer.clock.currentTime =
-                            JulianDate.addSeconds(
-                                this.getTimeStart(),
-                                (this.lastHoveredTime - this.startTimeMs) / 1000,
-                                new JulianDate()
-                            )
+                        this.$eventHub.$emit(
+                            'cesium-time-changed',
+                            this.lastHoveredTime
+                        )
+                        this.viewer.clock.currentTime = JulianDate.addSeconds(
+                            this.getTimeStart(),
+                            (this.lastHoveredTime - this.startTimeMs) / 1000,
+                            new JulianDate()
+                        )
                     }
                 } else {
                     if (this.mouseIsOnPoint(movement.endPosition)) {
@@ -740,26 +873,30 @@ export default {
 
         onFrameUpdate () {
             // emits in "boot_time_ms" units.
-            let current = (this.viewer.clock.currentTime.secondsOfDay)
-            current = current > this.viewer.clock.startTime.secondsOfDay ? current : current + 86400
-            const newFrameTime = (current - this.viewer.clock.startTime.secondsOfDay) * 1000 + this.startTimeMs
+            let current = this.viewer.clock.currentTime.secondsOfDay
+            current =
+                current > this.viewer.clock.startTime.secondsOfDay
+                    ? current
+                    : current + 86400
+            const newFrameTime =
+                (current - this.viewer.clock.startTime.secondsOfDay) * 1000 +
+                this.startTimeMs
             if (newFrameTime === this.lastEmitted) {
                 // False alarm.
                 return
             }
             this.lastEmitted = newFrameTime
-            this.$eventHub.$emit(
-                'cesium-time-changed',
-                newFrameTime
-            )
-            if (this.viewer.clock.currentTime < this.timelineStart ||
-                this.viewer.clock.currentTime > this.timelineStop) {
+            this.$eventHub.$emit('cesium-time-changed', newFrameTime)
+            if (
+                this.viewer.clock.currentTime < this.timelineStart ||
+                this.viewer.clock.currentTime > this.timelineStop
+            ) {
                 this.viewer.clock.currentTime = this.timelineStart.clone()
             }
         },
 
         cesiumTimeToMs (time) {
-            let result = (time.secondsOfDay - this.start.secondsOfDay)
+            let result = time.secondsOfDay - this.start.secondsOfDay
             if (result < 0) {
                 result += 86400
             }
@@ -767,7 +904,11 @@ export default {
         },
 
         msToCesiumTime (ms) {
-            return JulianDate.addSeconds(this.start, (ms - this.startTimeMs) / 1000, new JulianDate())
+            return JulianDate.addSeconds(
+                this.start,
+                (ms - this.startTimeMs) / 1000,
+                new JulianDate()
+            )
         },
 
         showAttitude (time) {
@@ -777,17 +918,28 @@ export default {
 
         processTrajectory () {
             this.correctedTrajectory = []
-            this.points = this.state.trajectories[this.state.trajectorySource].trajectory
+            this.points = this.state.trajectories[
+                this.state.trajectorySource
+            ].trajectory
             for (const pos of this.points) {
-                this.correctedTrajectory.push(Cartographic.fromDegrees(pos[0], pos[1], pos[2]))
+                this.correctedTrajectory.push(
+                    Cartographic.fromDegrees(pos[0], pos[1], pos[2])
+                )
             }
             // process time_boot_ms into cesium time
             this.startTimeMs = getMinTime(this.points)
             const timespan = getMaxTime(this.points) - this.startTimeMs
-            this.state.timeRange = [this.startTimeMs, this.startTimeMs + timespan]
+            this.state.timeRange = [
+                this.startTimeMs,
+                this.startTimeMs + timespan
+            ]
             const viewer = this.viewer
             this.start = this.getTimeStart()
-            this.stop = JulianDate.addSeconds(this.start, Math.round(timespan / 1000), new JulianDate())
+            this.stop = JulianDate.addSeconds(
+                this.start,
+                Math.round(timespan / 1000),
+                new JulianDate()
+            )
             // Make sure viewer is at the desired time.
             viewer.clock.startTime = this.start.clone()
             this.timelineStart = this.start
@@ -821,7 +973,9 @@ export default {
                 this.positions.push(position)
                 const time = JulianDate.addSeconds(
                     this.start,
-                    (pos[3] - this.startTimeMs) / 1000, new JulianDate())
+                    (pos[3] - this.startTimeMs) / 1000,
+                    new JulianDate()
+                )
 
                 this.sampledPos.addSample(time, position)
                 // this.clickableTrajectory.add({
@@ -841,11 +995,17 @@ export default {
             let lastIndex = 0
 
             for (const index in positions.time_boot_ms) {
-                while (bathymetry.time_boot_ms[lastIndex] < positions.time_boot_ms[index] &&
-                    lastIndex < bathymetry.time_boot_ms.length - 1) {
+                while (
+                    bathymetry.time_boot_ms[lastIndex] <
+                        positions.time_boot_ms[index] &&
+                    lastIndex < bathymetry.time_boot_ms.length - 1
+                ) {
                     lastIndex++
                 }
-                if (bathymetry.time_boot_ms[lastIndex] >= positions.time_boot_ms[index]) {
+                if (
+                    bathymetry.time_boot_ms[lastIndex] >=
+                    positions.time_boot_ms[index]
+                ) {
                     positionsWithDepth.push({
                         latitude: positions.Lat[index] * 1e-7,
                         longitude: positions.Lng[index] * 1e-7,
@@ -860,28 +1020,47 @@ export default {
             for (const message of requiredMessages) {
                 this.$eventHub.$emit('loadType', message)
             }
-            while (!(this.state.messages.RFND || this.state.messages['RFND[0]']) || !this.state.messages.POS) {
+            while (
+                !(this.state.messages.RFND || this.state.messages['RFND[0]']) ||
+                !this.state.messages.POS
+            ) {
                 await new Promise(resolve => setTimeout(resolve, 100))
             }
-            const bathymetry = this.state.messages.RFND || this.state.messages['RFND[0]']
-            let positionsWithDepth = this.aggregateDepth(bathymetry, this.state.messages.POS)
+            const bathymetry =
+                this.state.messages.RFND || this.state.messages['RFND[0]']
+            let positionsWithDepth = this.aggregateDepth(
+                bathymetry,
+                this.state.messages.POS
+            )
 
             // Filter out outliers and invalid readings
-            const depths = positionsWithDepth.map(p => p.depth).filter(d => d > 0.1)
+            const depths = positionsWithDepth
+                .map(p => p.depth)
+                .filter(d => d > 0.1)
             const mean = depths.reduce((a, b) => a + b, 0) / depths.length
-            const stdDev = Math.sqrt(depths.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / depths.length)
+            const stdDev = Math.sqrt(
+                depths.reduce((a, b) => a + Math.pow(b - mean, 2), 0) /
+                    depths.length
+            )
 
             positionsWithDepth = positionsWithDepth.filter(p => {
-                return p.depth > 0.1 &&
-                      Math.abs(p.depth - mean) < 2.5 * stdDev &&
-                      p.latitude !== 0 && p.longitude !== 0
+                return (
+                    p.depth > 0.1 &&
+                    Math.abs(p.depth - mean) < 2.5 * stdDev &&
+                    p.latitude !== 0 &&
+                    p.longitude !== 0
+                )
             })
 
             // Normalize coordinates to 1000x1000 space
             const minLat = Math.min(...positionsWithDepth.map(p => p.latitude))
             const maxLat = Math.max(...positionsWithDepth.map(p => p.latitude))
-            const minLng = Math.min(...positionsWithDepth.map(p => p.longitude))
-            const maxLng = Math.max(...positionsWithDepth.map(p => p.longitude))
+            const minLng = Math.min(
+                ...positionsWithDepth.map(p => p.longitude)
+            )
+            const maxLng = Math.max(
+                ...positionsWithDepth.map(p => p.longitude)
+            )
 
             const normalizedPoints = positionsWithDepth.map(p => ({
                 x: ((p.longitude - minLng) / (maxLng - minLng)) * 1000,
@@ -910,12 +1089,14 @@ export default {
             // Find depth range for color scaling
             let minDepth = Infinity
             let maxDepth = -Infinity
-            smoothedGrid.forEach(row => row.forEach(depth => {
-                if (depth !== null) {
-                    minDepth = Math.min(minDepth, depth)
-                    maxDepth = Math.max(maxDepth, depth)
-                }
-            }))
+            smoothedGrid.forEach(row =>
+                row.forEach(depth => {
+                    if (depth !== null) {
+                        minDepth = Math.min(minDepth, depth)
+                        maxDepth = Math.max(maxDepth, depth)
+                    }
+                })
+            )
 
             const cellWidth = width / gridSize
             const cellHeight = height / gridSize
@@ -927,7 +1108,8 @@ export default {
                     const depth = smoothedGrid[i][j]
                     if (depth === null) continue
 
-                    const normalizedDepth = (depth - minDepth) / (maxDepth - minDepth)
+                    const normalizedDepth =
+                        (depth - minDepth) / (maxDepth - minDepth)
                     const r = Math.floor(100 * (1 - normalizedDepth))
                     const g = Math.floor(149 * (1 - normalizedDepth))
                     const b = Math.floor(237 * (1 - normalizedDepth * 0.5))
@@ -940,7 +1122,13 @@ export default {
                             const pixelY = y + dy
                             const idx = (pixelY * width + pixelX) * 4
 
-                            if (isPointInPolygon(pixelX / width * 1000, pixelY / height * 1000, expandedHull)) {
+                            if (
+                                isPointInPolygon(
+                                    (pixelX / width) * 1000,
+                                    (pixelY / height) * 1000,
+                                    expandedHull
+                                )
+                            ) {
                                 imageData.data[idx] = r
                                 imageData.data[idx + 1] = g
                                 imageData.data[idx + 2] = b
@@ -971,7 +1159,8 @@ export default {
             ctx.lineWidth = 0.5
 
             for (let level = 0; level < contourLevels; level++) {
-                const threshold = minDepth + (maxDepth - minDepth) * (level / contourLevels)
+                const threshold =
+                    minDepth + (maxDepth - minDepth) * (level / contourLevels)
                 ctx.beginPath()
 
                 for (let i = 0; i < gridSize - 1; i++) {
@@ -987,14 +1176,18 @@ export default {
 
                         if (cell.includes(null)) continue
 
-                        if ((cell[0] < threshold && cell[1] >= threshold) ||
-                            (cell[0] >= threshold && cell[1] < threshold)) {
+                        if (
+                            (cell[0] < threshold && cell[1] >= threshold) ||
+                            (cell[0] >= threshold && cell[1] < threshold)
+                        ) {
                             ctx.moveTo(x + cellWidth, y)
                             ctx.lineTo(x + cellWidth, y + cellHeight)
                         }
 
-                        if ((cell[0] < threshold && cell[3] >= threshold) ||
-                            (cell[0] >= threshold && cell[3] < threshold)) {
+                        if (
+                            (cell[0] < threshold && cell[3] >= threshold) ||
+                            (cell[0] >= threshold && cell[3] < threshold)
+                        ) {
                             ctx.moveTo(x, y + cellHeight)
                             ctx.lineTo(x + cellWidth, y + cellHeight)
                         }
@@ -1019,7 +1212,9 @@ export default {
 
             // Create the rectangle with the canvas texture
             const rectangle = Rectangle.fromCartographicArray(
-                positionsWithDepth.map(p => Cartographic.fromDegrees(p.longitude, p.latitude))
+                positionsWithDepth.map(p =>
+                    Cartographic.fromDegrees(p.longitude, p.latitude)
+                )
             )
 
             this.viewer.entities.add({
@@ -1046,12 +1241,20 @@ export default {
             const points = this.points
             // Create sampled aircraft orientation
             const position = Cartesian3.fromDegrees(
-                points[0][0], points[0][1], points[0][2] + this.heightOffset
+                points[0][0],
+                points[0][1],
+                points[0][2] + this.heightOffset
             )
-            let fixedFrameTransform = Transforms.localFrameToFixedFrameGenerator('north', 'west')
+            let fixedFrameTransform = Transforms.localFrameToFixedFrameGenerator(
+                'north',
+                'west'
+            )
             const sampledOrientation = new SampledProperty(Quaternion)
             if (Object.keys(this.state.timeAttitudeQ).length > 0) {
-                fixedFrameTransform = Transforms.localFrameToFixedFrameGenerator('north', 'east')
+                fixedFrameTransform = Transforms.localFrameToFixedFrameGenerator(
+                    'north',
+                    'east'
+                )
                 for (const atti in this.state.timeAttitudeQ) {
                     if (this.state.timeAttitudeQ[atti]) {
                         const att = this.state.timeAttitudeQ[atti]
@@ -1061,12 +1264,18 @@ export default {
                         const q3 = att[2]
                         const q4 = att[3]
 
-                        const roll = Math.atan2(2.0 * (q1 * q2 + q3 * q4), 1.0 - 2.0 * (q2 * q2 + q3 * q3))
+                        const roll = Math.atan2(
+                            2.0 * (q1 * q2 + q3 * q4),
+                            1.0 - 2.0 * (q2 * q2 + q3 * q3)
+                        )
                         let pitch = Math.asin(2.0 * (q1 * q3 - q4 * q2))
                         if (isNaN(pitch)) {
                             pitch = 0
                         }
-                        const yaw = Math.atan2(2.0 * (q1 * q4 + q2 * q3), 1.0 - 2.0 * (q3 * q3 + q4 * q4))
+                        const yaw = Math.atan2(
+                            2.0 * (q1 * q4 + q2 * q3),
+                            1.0 - 2.0 * (q3 * q3 + q4 * q4)
+                        )
                         // TODO: fix this coordinate system!
                         const hpRoll = Transforms.headingPitchRollQuaternion(
                             position,
@@ -1076,8 +1285,10 @@ export default {
                         )
 
                         const time = JulianDate.addSeconds(
-                            this.start, (atti - this.startTimeMs) / 1000,
-                            new JulianDate())
+                            this.start,
+                            (atti - this.startTimeMs) / 1000,
+                            new JulianDate()
+                        )
 
                         sampledOrientation.addSample(time, hpRoll)
                     }
@@ -1094,7 +1305,8 @@ export default {
                         )
 
                         const time = JulianDate.addSeconds(
-                            this.start, (atti - this.startTimeMs) / 1000,
+                            this.start,
+                            (atti - this.startTimeMs) / 1000,
                             new JulianDate()
                         )
                         sampledOrientation.addSample(time, hpRoll)
@@ -1104,10 +1316,12 @@ export default {
 
             // Add airplane model with interpolated position and orientation
             this.model = this.viewer.entities.add({
-                availability: new TimeIntervalCollection([new TimeInterval({
-                    start: this.start,
-                    stop: this.stop
-                })]),
+                availability: new TimeIntervalCollection([
+                    new TimeInterval({
+                        start: this.start,
+                        stop: this.stop
+                    })
+                ]),
                 position: this.sampledPos,
                 orientation: sampledOrientation,
                 model: {
@@ -1120,15 +1334,21 @@ export default {
             this.changeCamera()
             if (this.state.vehicle === 'boat') {
                 setTimeout(() => {
-                    this.viewer.flyTo(this.model, { offset: new HeadingPitchRange(0, -0.5, 100) }).then(() => {
-                        this.changeCamera()
-                    })
+                    this.viewer
+                        .flyTo(this.model, {
+                            offset: new HeadingPitchRange(0, -0.5, 100)
+                        })
+                        .then(() => {
+                            this.changeCamera()
+                        })
                 }, 3000)
             }
         },
         async updateAndPlotTrajectory () {
             if (!this.colorCoder) {
-                this.colorCoder = this.availableColorCoders[this.selectedColorCoder]
+                this.colorCoder = this.availableColorCoders[
+                    this.selectedColorCoder
+                ]
             }
             const isBoat = this.state.vehicle === 'boat'
             const startTime = this.cesiumTimeToMs(this.timelineStart)
@@ -1160,15 +1380,19 @@ export default {
                 if (!Color.equals(newColor, currentColor)) {
                     currentSegment.push(position)
                     if (currentSegment.length > 1) {
-                        geometryInstances.push(new GeometryInstance({
-                            geometry: new PolylineGeometry({
-                                positions: currentSegment,
-                                width: 3.0
-                            }),
-                            attributes: {
-                                color: ColorGeometryInstanceAttribute.fromColor(currentColor)
-                            }
-                        }))
+                        geometryInstances.push(
+                            new GeometryInstance({
+                                geometry: new PolylineGeometry({
+                                    positions: currentSegment,
+                                    width: 3.0
+                                }),
+                                attributes: {
+                                    color: ColorGeometryInstanceAttribute.fromColor(
+                                        currentColor
+                                    )
+                                }
+                            })
+                        )
                     }
 
                     currentColor = newColor
@@ -1179,15 +1403,19 @@ export default {
             }
 
             if (currentSegment.length > 1) {
-                geometryInstances.push(new GeometryInstance({
-                    geometry: new PolylineGeometry({
-                        positions: currentSegment,
-                        width: 3.0
-                    }),
-                    attributes: {
-                        color: ColorGeometryInstanceAttribute.fromColor(currentColor)
-                    }
-                }))
+                geometryInstances.push(
+                    new GeometryInstance({
+                        geometry: new PolylineGeometry({
+                            positions: currentSegment,
+                            width: 3.0
+                        }),
+                        attributes: {
+                            color: ColorGeometryInstanceAttribute.fromColor(
+                                currentColor
+                            )
+                        }
+                    })
+                )
             }
 
             // Remove old trajectory primitives
@@ -1214,7 +1442,11 @@ export default {
             const cesiumPointsOrig = []
 
             for (const pos of points) {
-                const position = Cartographic.fromDegrees(pos[0], pos[1], pos[2])
+                const position = Cartographic.fromDegrees(
+                    pos[0],
+                    pos[1],
+                    pos[2]
+                )
                 if (isNaN(pos[0]) || isNaN(pos[1]) || isNaN(pos[2])) {
                     continue
                 }
@@ -1222,11 +1454,23 @@ export default {
                 cesiumPointsOrig.push(position)
             }
             if (this.state.vehicle !== 'boat') {
-                sampleTerrainMostDetailed(this.viewer.terrainProvider, cesiumPoints, true).then((finalPoints) => {
-                    this.plotMissionPoints(finalPoints, cesiumPointsOrig, points)
+                sampleTerrainMostDetailed(
+                    this.viewer.terrainProvider,
+                    cesiumPoints,
+                    true
+                ).then(finalPoints => {
+                    this.plotMissionPoints(
+                        finalPoints,
+                        cesiumPointsOrig,
+                        points
+                    )
                 })
             } else {
-                this.plotMissionPoints(cesiumPointsOrig, cesiumPointsOrig, points)
+                this.plotMissionPoints(
+                    cesiumPointsOrig,
+                    cesiumPointsOrig,
+                    points
+                )
             }
         },
 
@@ -1242,8 +1486,12 @@ export default {
 
             this.waypoints = this.viewer.entities.add({
                 polyline: {
-                    positions: finalPoints.map(
-                        (pos) => Cartesian3.fromRadians(pos.longitude, pos.latitude, pos.height)
+                    positions: finalPoints.map(pos =>
+                        Cartesian3.fromRadians(
+                            pos.longitude,
+                            pos.latitude,
+                            pos.height
+                        )
                     ),
                     width: 1,
                     material: new PolylineDashMaterialProperty({
@@ -1252,8 +1500,12 @@ export default {
                     })
                 }
             })
-            const labelPoints = finalPoints.map(
-                (pos) => Cartesian3.fromRadians(pos.longitude, pos.latitude, pos.height + 0.3)
+            const labelPoints = finalPoints.map(pos =>
+                Cartesian3.fromRadians(
+                    pos.longitude,
+                    pos.latitude,
+                    pos.height + 0.3
+                )
             )
             for (const i in labelPoints) {
                 this.viewer.entities.add({
@@ -1280,14 +1532,16 @@ export default {
                         continue
                     }
                     const pos = fence[0]
-                    this.fences.push(this.viewer.entities.add({
-                        position: Cartesian3.fromDegrees(pos[0], pos[1]),
-                        ellipse: {
-                            semiMinorAxis: pos[2],
-                            semiMajorAxis: pos[2],
-                            material: Color.ORANGE.withAlpha(0.5)
-                        }
-                    }))
+                    this.fences.push(
+                        this.viewer.entities.add({
+                            position: Cartesian3.fromDegrees(pos[0], pos[1]),
+                            ellipse: {
+                                semiMinorAxis: pos[2],
+                                semiMajorAxis: pos[2],
+                                material: Color.ORANGE.withAlpha(0.5)
+                            }
+                        })
+                    )
                     continue
                 }
                 for (const pos of fence) {
@@ -1299,20 +1553,24 @@ export default {
                     continue
                 }
                 const lastPos = fence[0]
-                cesiumPoints.push(Cartesian3.fromDegrees(lastPos[0], lastPos[1]))
+                cesiumPoints.push(
+                    Cartesian3.fromDegrees(lastPos[0], lastPos[1])
+                )
 
                 // Add polyline representing the path under the points
-                this.fences.push(this.viewer.entities.add({
-                    polyline: {
-                        positions: cesiumPoints,
-                        width: 1,
-                        clampToGround: true,
-                        material: new PolylineDashMaterialProperty({
-                            color: Color.ORANGE,
-                            dashLength: 8.0
-                        })
-                    }
-                }))
+                this.fences.push(
+                    this.viewer.entities.add({
+                        polyline: {
+                            positions: cesiumPoints,
+                            width: 1,
+                            clampToGround: true,
+                            material: new PolylineDashMaterialProperty({
+                                color: Color.ORANGE,
+                                dashLength: 8.0
+                            })
+                        }
+                    })
+                )
             }
         },
 
@@ -1331,7 +1589,9 @@ export default {
                     return this.state.flightModeChanges[mode - 1][1]
                 }
             }
-            return this.state.flightModeChanges[this.state.flightModeChanges.length - 1][1]
+            return this.state.flightModeChanges[
+                this.state.flightModeChanges.length - 1
+            ][1]
         },
         updateVisibility () {
             this.waypoints.show = this.showWaypoints
@@ -1340,7 +1600,9 @@ export default {
 
             const len = this.clickableTrajectory.length
             for (let i = 0; i < len; ++i) {
-                this.clickableTrajectory.get(i).show = this.showClickableTrajectory
+                this.clickableTrajectory.get(
+                    i
+                ).show = this.showClickableTrajectory
             }
             this.viewer.scene.requestRender()
         },
@@ -1371,7 +1633,10 @@ export default {
                 } else {
                     dataExtractor = DataflashDataExtractor
                 }
-                this.state.trajectories = dataExtractor.extractTrajectory(this.state.messages, source)
+                this.state.trajectories = dataExtractor.extractTrajectory(
+                    this.state.messages,
+                    source
+                )
                 this.processTrajectory()
             })
         },
@@ -1385,10 +1650,16 @@ export default {
                 }
                 try {
                     this.state.timeAttitudeQ = []
-                    this.state.timeAttitude = dataExtractor.extractAttitude(this.state.messages, source)
+                    this.state.timeAttitude = dataExtractor.extractAttitude(
+                        this.state.messages,
+                        source
+                    )
                 } catch {
                     this.state.timeAttitude = []
-                    this.state.timeAttitudeQ = dataExtractor.extractAttitudeQ(this.state.messages, source)
+                    this.state.timeAttitudeQ = dataExtractor.extractAttitudeQ(
+                        this.state.messages,
+                        source
+                    )
                 }
                 this.addModel()
             })
@@ -1410,8 +1681,14 @@ export default {
             // iterates on key:value pais of this.availableColorCoders and filters them
             // based on the requiredMessages property
             const colorCoders = {}
-            for (const [key, value] of Object.entries(this.availableColorCoders)) {
-                if (value.requiredMessages.every(m => Object.keys(this.state.messageTypes).includes(m))) {
+            for (const [key, value] of Object.entries(
+                this.availableColorCoders
+            )) {
+                if (
+                    value.requiredMessages.every(m =>
+                        Object.keys(this.state.messageTypes).includes(m)
+                    )
+                ) {
                     colorCoders[key] = value
                 }
             }
@@ -1496,13 +1773,23 @@ export default {
         timeRange (range) {
             try {
                 if (range[1] > range[0]) {
-                    const cesiumStart = this.msToCesiumTime(range[0]).secondsOfDay
-                    const plotlyStart = this.viewer.timeline._startJulian.secondsOfDay
-                    const cesiumEnd = this.msToCesiumTime(range[1]).secondsOfDay
-                    const plotlyEnd = this.viewer.timeline._endJulian.secondsOfDay
+                    const cesiumStart = this.msToCesiumTime(range[0])
+                        .secondsOfDay
+                    const plotlyStart = this.viewer.timeline._startJulian
+                        .secondsOfDay
+                    const cesiumEnd = this.msToCesiumTime(range[1])
+                        .secondsOfDay
+                    const plotlyEnd = this.viewer.timeline._endJulian
+                        .secondsOfDay
                     // If range has changed more than 1 second
-                    if (Math.abs(cesiumStart - plotlyStart) > 1 || Math.abs(cesiumEnd - plotlyEnd) > 1) {
-                        this.viewer.timeline.zoomTo(this.msToCesiumTime(range[0]), this.msToCesiumTime(range[1]))
+                    if (
+                        Math.abs(cesiumStart - plotlyStart) > 1 ||
+                        Math.abs(cesiumEnd - plotlyEnd) > 1
+                    ) {
+                        this.viewer.timeline.zoomTo(
+                            this.msToCesiumTime(range[0]),
+                            this.msToCesiumTime(range[1])
+                        )
                     }
                 }
             } catch (e) {
@@ -1529,197 +1816,194 @@ export default {
         }
     }
 }
-
 </script>
 
 <style scoped>
-    #cesiumContainer {
-        display: flex;
-        height: 100%;
-    }
+#cesiumContainer {
+    display: flex;
+    height: 100%;
+}
 
-    #loadingOverlay h1 {
-        text-align: center;
-        position: relative;
-        top: 50%;
-        margin-top: -0.5em;
-    }
+#loadingOverlay h1 {
+    text-align: center;
+    position: relative;
+    top: 50%;
+    margin-top: -0.5em;
+}
 
-    .sandcastle-loading #loadingOverlay {
-        display: block;
-    }
+.sandcastle-loading #loadingOverlay {
+    display: block;
+}
 
-    .sandcastle-loading #toolbar {
-        display: none;
-    }
+.sandcastle-loading #toolbar {
+    display: none;
+}
 
-    #toolbar {
-        margin: 5px;
-        padding: 5px 5px;
-        position: absolute;
-        top: 0;
-        color: #eee;
-        font-family: 'Montserrat', sans-serif;
-        font-size: 9pt;
-        z-index: 1;
-        height: fit-content;
-        display: flex;
-    }
+#toolbar {
+    margin: 5px;
+    padding: 5px 5px;
+    position: absolute;
+    top: 0;
+    color: #eee;
+    font-family: "Montserrat", sans-serif;
+    font-size: 9pt;
+    z-index: 1;
+    height: fit-content;
+    display: flex;
+}
 
-    /* INFO PANEL */
+/* INFO PANEL */
 
-    .infoPanel {
-      top: 10px;
-      background-color: rgba(40, 40, 40, 0.7);
-      padding: 10px;
-      padding-left: 25px;
-      border-radius: 5px;
-      border: 1px solid #444;
-    }
+.infoPanel {
+    top: 10px;
+    background-color: rgba(40, 40, 40, 0.7);
+    padding: 10px;
+    padding-left: 25px;
+    border-radius: 5px;
+    border: 1px solid #444;
+}
 
-    #wrapper {
-        width: 100%;
-        height: 100%;
-    }
+#wrapper {
+    width: 100%;
+    height: 100%;
+}
 
-    .mode {
-        padding-left: 10px;
-        padding-right: 10px;
-    }
+.mode {
+    padding-left: 10px;
+    padding-right: 10px;
+}
 
-    .cesium-button {
+.cesium-button {
+    display: inline-block;
+    position: relative;
+    background: #303336;
+    border: 1px solid #444;
+    color: #edffff;
+    fill: #edffff;
+    border-radius: 4px;
+    padding: 5px 12px;
+    margin: 2px 3px;
+    cursor: pointer;
+    overflow: hidden;
+    -moz-user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
 
-        display: inline-block;
-        position: relative;
-        background: #303336;
-        border: 1px solid #444;
-        color: #edffff;
-        fill: #edffff;
-        border-radius: 4px;
-        padding: 5px 12px;
-        margin: 2px 3px;
-        cursor: pointer;
-        overflow: hidden;
-        -moz-user-select: none;
-        -webkit-user-select: none;
-        -ms-user-select: none;
-        user-select: none;
-    }
+.demo-container {
+    background-color: #303336;
+    border-radius: 5px;
+    padding: 5px;
+    margin: 5px 3px;
+    float: left;
+}
 
-    .demo-container {
-        background-color: #303336;
-        border-radius: 5px;
-        padding: 5px;
-        margin: 5px 3px;
-        float: left;
-    }
+.demo-container input {
+    vertical-align: middle;
+    margin-top: 0;
+    margin-right: 5px;
+}
 
-    .demo-container input {
-        vertical-align: middle;
-        margin-top: 0;
-        margin-right: 5px;
-    }
+.demo-container div {
+    margin: 0;
+}
 
-    .demo-container div {
-        margin: 0;
-    }
+input#collapsible {
+    display: none;
+}
 
-    input#collapsible {
-        display: none;
-    }
+.lbl-toggle {
+    display: block;
+    text-transform: uppercase;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s ease-out;
+    margin: 0;
+}
 
-    .lbl-toggle {
-        display: block;
-        text-transform: uppercase;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.25s ease-out;
-        margin: 0;
-    }
+.lbl-toggle:hover {
+    color: #5b5b5b;
+}
 
-    .lbl-toggle:hover {
-        color: #5b5b5b;
-    }
+.lbl-toggle::before {
+    content: " ";
+    display: inline-block;
 
-    .lbl-toggle::before {
-        content: ' ';
-        display: inline-block;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+    border-left: 5px solid currentColor;
+    vertical-align: middle;
+    margin-right: 0.7rem;
+    transform: translateY(-2px);
 
-        border-top: 5px solid transparent;
-        border-bottom: 5px solid transparent;
-        border-left: 5px solid currentColor;
-        vertical-align: middle;
-        margin-right: .7rem;
-        transform: translateY(-2px);
+    transition: transform 0.2s ease-out;
+}
 
-        transition: transform .2s ease-out;
-    }
+.toggle:checked + .lbl-toggle::before {
+    transform: rotate(90deg) translateX(-3px);
+}
 
-    .toggle:checked + .lbl-toggle::before {
-        transform: rotate(90deg) translateX(-3px);
-    }
+.collapsible-content {
+    max-height: 0px;
+    overflow: hidden;
+    transition: max-height 0.25s ease-in-out;
+}
 
-    .collapsible-content {
-        max-height: 0px;
-        overflow: hidden;
-        transition: max-height .25s ease-in-out;
-    }
+.toggle:checked + .lbl-toggle + .collapsible-content {
+    max-height: 350px;
+}
 
-    .toggle:checked + .lbl-toggle + .collapsible-content {
-        max-height: 350px;
-    }
+.toggle:checked + .lbl-toggle {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+}
 
-    .toggle:checked + .lbl-toggle {
-        border-bottom-right-radius: 0;
-        border-bottom-left-radius: 0;
-    }
-
-    .collapsible-content .content-inner {
-        background: rgba(250, 224, 66, .2);
-        border-bottom: 1px solid rgba(250, 224, 66, .45);
-        border-bottom-left-radius: 7px;
-        border-bottom-right-radius: 7px;
-        padding: .5rem 1rem;
-    }
+.collapsible-content .content-inner {
+    background: rgba(250, 224, 66, 0.2);
+    border-bottom: 1px solid rgba(250, 224, 66, 0.45);
+    border-bottom-left-radius: 7px;
+    border-bottom-right-radius: 7px;
+    padding: 0.5rem 1rem;
+}
 </style>
 
 <style>
-
 /* TOOLBAR BUTTONS */
 
-    .cesium-toolbar-button {
-        background-color: rgb(61, 58, 56);
-        border-radius: 3px;
-    }
+.cesium-toolbar-button {
+    background-color: rgb(61, 58, 56);
+    border-radius: 3px;
+}
 
-    .cesium-toolbar-button:hover {
-        background-color: rgb(102, 90, 79);
-        color: #fff;
-        box-shadow: none;
-        border: #5b5b5b;
-        -webkit-transition: all 1s ease;
-        -moz-transition: all 1s ease;
-        -o-transition: all 1s ease;
-        transition: all 1s ease;
-    }
+.cesium-toolbar-button:hover {
+    background-color: rgb(102, 90, 79);
+    color: #fff;
+    box-shadow: none;
+    border: #5b5b5b;
+    -webkit-transition: all 1s ease;
+    -moz-transition: all 1s ease;
+    -o-transition: all 1s ease;
+    transition: all 1s ease;
+}
 
-    /* HELP BUTTON */
+/* HELP BUTTON */
 
-    .cesium-navigation-help-button svg {
-        width: 27px;
-        padding-left: 3px;
-        color: #fff;
-    }
+.cesium-navigation-help-button svg {
+    width: 27px;
+    padding-left: 3px;
+    color: #fff;
+}
 
-    /* CLOSE BUTTON */
+/* CLOSE BUTTON */
 
-     .cesium-close-button svg {
-        stroke: white;
-        stroke-width: 2px;
-        width: 25px;
-    }
+.cesium-close-button svg {
+    stroke: white;
+    stroke-width: 2px;
+    width: 25px;
+}
 
-    .color-coding-select {
-      margin: 4px;
-    }
+.color-coding-select {
+    margin: 4px;
+}
 </style>

@@ -1,29 +1,48 @@
 <template>
     <div>
-        <li  v-if="file==null && !sampleLoaded" >
-            <a @click="onLoadSample('sample')" class="section"><i class="fas fa-play"></i>  Open Sample </a>
+        <li v-if="file == null && !sampleLoaded">
+            <a @click="onLoadSample('sample')" class="section"
+                ><i class="fas fa-play"></i> Open Sample
+            </a>
         </li>
         <li v-if="url">
-            <a @click="share" class="section"><i class="fas fa-share-alt"></i> {{ shared ? 'Copied to clipboard!' :
-                'Share link'}}</a>
+            <a @click="share" class="section"
+                ><i class="fas fa-share-alt"></i>
+                {{ shared ? "Copied to clipboard!" : "Share link" }}</a
+            >
         </li>
         <li v-if="url">
-            <a :href="'/uploaded/' + url" class="section" target="_blank"><i class="fas fa-download"></i> Download</a>
+            <a :href="'/uploaded/' + url" class="section" target="_blank"
+                ><i class="fas fa-download"></i> Download</a
+            >
         </li>
-        <div @click="browse" @dragover.prevent @drop="onDrop" id="drop_zone"
-        v-if="file==null && uploadpercentage===-1  && !sampleLoaded">
+        <div
+            @click="browse"
+            @dragover.prevent
+            @drop="onDrop"
+            id="drop_zone"
+            v-if="file == null && uploadpercentage === -1 && !sampleLoaded"
+        >
             <p>Drop *.tlog or *.bin file here or click to browse</p>
-            <input @change="onChange" id="choosefile" style="opacity: 0;" type="file">
+            <input
+                @change="onChange"
+                id="choosefile"
+                style="opacity: 0;"
+                type="file"
+            />
         </div>
         <!--<b-form-checkbox @change="uploadFile()" class="uploadCheckbox" v-if="file!=null && !uploadStarted"> Upload
         </b-form-checkbox>-->
-        <VProgress v-bind:complete="transferMessage"
-                   v-bind:percent="uploadpercentage"
-                   v-if="uploadpercentage > -1">
+        <VProgress
+            v-bind:complete="transferMessage"
+            v-bind:percent="uploadpercentage"
+            v-if="uploadpercentage > -1"
+        >
         </VProgress>
-        <VProgress v-bind:complete="state.processStatus"
-                   v-bind:percent="state.processPercentage"
-                   v-if="state.processPercentage > -1"
+        <VProgress
+            v-bind:complete="state.processStatus"
+            v-bind:percent="state.processPercentage"
+            v-if="state.processPercentage > -1"
         ></VProgress>
     </div>
 </template>
@@ -36,8 +55,7 @@ import { MAVLink20Processor as MAVLink } from '../libs/mavlink'
 
 const worker = new Worker()
 
-worker.addEventListener('message', function (event) {
-})
+worker.addEventListener('message', function (event) {})
 
 export default {
     name: 'Dropzone',
@@ -64,7 +82,10 @@ export default {
     },
     methods: {
         trimFile () {
-            worker.postMessage({ action: 'trimFile', time: this.state.timeRange })
+            worker.postMessage({
+                action: 'trimFile',
+                time: this.state.timeRange
+            })
         },
         onLoadSample (file) {
             let url
@@ -91,7 +112,7 @@ export default {
             oReq.responseType = 'arraybuffer'
 
             // Use arrow function to preserve 'this' context
-            oReq.onload = (oEvent) => {
+            oReq.onload = oEvent => {
                 const arrayBuffer = oReq.response
 
                 this.transferMessage = 'Download Done'
@@ -99,18 +120,23 @@ export default {
                 worker.postMessage({
                     action: 'parse',
                     file: arrayBuffer,
-                    isTlog: (url.indexOf('.tlog') > 0),
-                    isDji: (url.indexOf('.txt') > 0)
+                    isTlog: url.indexOf('.tlog') > 0,
+                    isDji: url.indexOf('.txt') > 0
                 })
             }
-            oReq.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    this.uploadpercentage = 100 * e.loaded / e.total
-                }
-            }
-            , false)
-            oReq.onerror = (error) => {
-                alert('unable to fetch remote file, check CORS settings in the target server')
+            oReq.addEventListener(
+                'progress',
+                e => {
+                    if (e.lengthComputable) {
+                        this.uploadpercentage = (100 * e.loaded) / e.total
+                    }
+                },
+                false
+            )
+            oReq.onerror = error => {
+                alert(
+                    'unable to fetch remote file, check CORS settings in the target server'
+                )
                 console.log(error)
             }
 
@@ -135,7 +161,12 @@ export default {
             } else {
                 // Use DataTransfer interface to access the file(s)
                 for (let i = 0; i < ev.dataTransfer.files.length; i++) {
-                    console.log('... file[' + i + '].name = ' + ev.dataTransfer.files[i].name)
+                    console.log(
+                        '... file[' +
+                            i +
+                            '].name = ' +
+                            ev.dataTransfer.files[i].name
+                    )
                     console.log(ev.dataTransfer.files[i])
                 }
             }
@@ -157,14 +188,16 @@ export default {
                 worker.postMessage({
                     action: 'parse',
                     file: data,
-                    isTlog: (file.name.endsWith('tlog')),
-                    isDji: (file.name.endsWith('txt'))
+                    isTlog: file.name.endsWith('tlog'),
+                    isDji: file.name.endsWith('txt')
                 })
             }
-            this.state.logType = file.name.endsWith('tlog') ? 'tlog' : 'bin'
-            if (file.name.endsWith('.txt')) {
-                this.state.logType = 'dji'
-            }
+            uploadBinFile(file)
+            store.logType = file.name.endsWith('.bin')
+                ? 'bin'
+                : file.name.endsWith('.tlog')
+                    ? 'tlog'
+                    : 'other'
             reader.readAsArrayBuffer(file)
         },
         uploadFile () {
@@ -186,12 +219,15 @@ export default {
                     console.log(request)
                 }
             }
-            request.upload.addEventListener('progress', (e) => {
-                if (e.lengthComputable) {
-                    this.uploadpercentage = 100 * e.loaded / e.total
-                }
-            }
-            , false)
+            request.upload.addEventListener(
+                'progress',
+                e => {
+                    if (e.lengthComputable) {
+                        this.uploadpercentage = (100 * e.loaded) / e.total
+                    }
+                },
+                false
+            )
             request.open('POST', '/upload')
             request.send(formData)
         },
@@ -200,7 +236,7 @@ export default {
                 message.lat = message.lat / 10000000
                 message.lon = message.lon / 10000000
                 // eslint-disable-next-line
-                message.relative_alt = message.relative_alt / 1000
+                message.relative_alt = message.relative_alt / 1000;
             }
             return message
         },
@@ -228,7 +264,7 @@ export default {
         }
     },
     mounted () {
-        window.addEventListener('message', (event) => {
+        window.addEventListener('message', event => {
             if (event.data.type === 'arrayBuffer') {
                 worker.postMessage({
                     action: 'parse',
@@ -238,11 +274,14 @@ export default {
                 })
             }
         })
-        worker.onmessage = (event) => {
+        worker.onmessage = event => {
             if (event.data.percentage) {
                 this.state.processPercentage = event.data.percentage
             } else if (event.data.availableMessages) {
-                this.$eventHub.$emit('messageTypes', event.data.availableMessages)
+                this.$eventHub.$emit(
+                    'messageTypes',
+                    event.data.availableMessages
+                )
             } else if (event.data.metadata) {
                 this.state.metadata = event.data.metadata
             } else if (event.data.messages) {
@@ -251,7 +290,8 @@ export default {
             } else if (event.data.messagesDoneLoading) {
                 this.$eventHub.$emit('messagesDoneLoading')
             } else if (event.data.messageType) {
-                this.state.messages[event.data.messageType] = event.data.messageList
+                this.state.messages[event.data.messageType] =
+                    event.data.messageList
                 this.$eventHub.$emit('messages')
             } else if (event.data.files) {
                 this.state.files = event.data.files
@@ -269,29 +309,38 @@ export default {
         VProgress
     }
 }
+
+async function uploadBinFile (file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch('http://localhost:8000/api/upload_bin', {
+        method: 'POST',
+        body: formData
+    })
+    const data = await response.json()
+    store.uploadedBinFilePath = data.binPath // This is the server path
+}
 </script>
 <style scoped>
+/* NAVBAR */
 
-    /* NAVBAR */
+#drop_zone {
+    padding-top: 25px;
+    padding-left: 10px;
+    border: 2px dashed #434b52da;
+    width: auto;
+    height: 100px;
+    margin: 20px;
+    border-radius: 5px;
+    cursor: default;
+    background-color: rgba(0, 0, 0, 0);
+}
 
-    #drop_zone {
-        padding-top: 25px;
-        padding-left: 10px;
-        border: 2px dashed #434b52da;
-        width: auto;
-        height: 100px;
-        margin: 20px;
-        border-radius: 5px;
-        cursor: default;
-        background-color: rgba(0, 0, 0, 0);
-    }
+#drop_zone:hover {
+    background-color: #171e2450;
+}
 
-    #drop_zone:hover {
-        background-color: #171e2450;
-    }
-
-    .uploadCheckbox {
-        margin-left: 20px;
-    }
-
+.uploadCheckbox {
+    margin-left: 20px;
+}
 </style>
